@@ -1,0 +1,22 @@
+{
+	"default_weights": "/usr/share/makehuman/data/rigs/default_weights.mhw",
+	"mirror_vertices": "data/mirror_vertices.txt",
+	"base_object": "/usr/makehuman/data/3dobjs/base.obj",
+	"ranges": {
+    		"body": [0, 13379],
+		"tongue": [13380, 13605],
+		"joints": [13606, 14597],
+		"eyes": [14598, 14741],
+		"eyelashes": [14742, 14991],
+		"loteeth": [14992, 15059],
+		"upteeth": [15060, 15127],
+		"teeth": [14992, 15127],
+		"penis": [15128, 15327],
+		"tights": [15328, 18001],
+		"skirt": [18002, 18721],
+		"hair": [18722, 19149],
+		"ground": [19150, 19157],
+		"_end_": 19158
+	}
+}
+
