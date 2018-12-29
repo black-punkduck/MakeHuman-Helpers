@@ -3,11 +3,11 @@
 
 """
 
-**Project Name:**      MakeHuman Support Tools
+**Project Name:**      MakeHuman-Helpers
 
 **Authors:**           Black Punkduck
 
-**Code Home Page:**    https://github.com
+**Code Home Page:**    https://github.com/black-punkduck/MakeHuman-Helpers
 
 **Copyright(c):**      Black Punkduck
 
