@@ -154,4 +154,6 @@ Just to see what is processed, check the result by comparing with *diff*:
 
         diff /tmp/original_weights /tmp/merged
 
+---
 
+### Append meshes to the basemesh
