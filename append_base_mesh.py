@@ -54,7 +54,7 @@ config = json.load (cfile)
 cfile.close()
 
 if len(args.b):
-    meshfile = args.f
+    meshfile = args.b
 else:
     meshfile = config["base_object"]
 
