@@ -43,13 +43,14 @@ configfilename = "data/mh_helper.json"
 
 parser = argparse.ArgumentParser(description='Create a table with all vertex number and mirror vertices and orientation.')
 parser.add_argument('-b', default="", metavar='base_object', help='an optional base mesh in .obj format (default: see configuration)')
+parser.add_argument('-m', default=0.0, metavar='MAXDIST', type=float,  help='maximum deviation allowed for being considered as a mirrored vertex')
 args = parser.parse_args()
 
 mirror = {}
 
 def GetMirrorVNum (x, y, z, m):
     for vnum in mirror.keys():
-        if (mirror[vnum]["x"] == -x) and (mirror[vnum]["y"] == y) and (mirror[vnum]["z"] == z):
+        if (abs(mirror[vnum]["x"] + x)) <= args.m and abs((mirror[vnum]["y"] - y)) <= args.m and abs((mirror[vnum]["z"] - z)) <= args.m:
             mirror[vnum]["m"] = m
             return (vnum)
 
@@ -84,9 +85,14 @@ print (str(vnum) + " vertices processed", file=sys.stderr)
 
 # now calculate mirror
 
+unmirrored = 0
 for i in range (0, vnum):
     if mirror[i]["m"] == -1:
         mirror[i]["m"] = GetMirrorVNum ( mirror[i]["x"], mirror[i]["y"], mirror[i]["z"], i)
+        if ( mirror[i]["m"] == -1):
+            unmirrored +=1 
+
+print (str(unmirrored) + " unmirrored vertices", file=sys.stderr)
 
 # print the result
 

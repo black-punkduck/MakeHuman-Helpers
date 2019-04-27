@@ -18,9 +18,9 @@ The configuration also contains the start vertices of the helpers.
 
 ## Create mirror table
 
-A small skript to create a mirror table of vertices from a symmetric (y-axis) wavefront (.obj) file. This table is used for symmetrizing objects
+A small skript to create a mirror table of vertices from a symmetric (y-axis) wavefront (.obj) file. This table is used for symmetrizing objects. Normally a deviation (MAXDIST) of 0.0 is allowed. If you edit your mesh in mirror mode set deviation to e.g. 0.001.
 
-    create_mirror_tab.py [-h] [-b base_object]
+    create_mirror_tab.py [-h] [-b base_object] [-m MAXDIST]
 
 The table contains all vertex numbers, mirror vertex numbers and orientations (l = left, r = right, m = mid)
 
