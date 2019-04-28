@@ -41,9 +41,9 @@ import argparse
 configfilename = "data/mh_helper.json"
 
 parser = argparse.ArgumentParser(description='Appends additional meshes to the base mesh.')
-parser.add_argument('-b', default="", metavar='default_weights', help='use different base mesh file (default: see configuration)')
+parser.add_argument('-b', default="", metavar='default_base', help='use different base mesh file (default: see configuration)')
 parser.add_argument('-p', default=4, metavar='PRECISION', type=int,  help='precision of weights (default: 4)')
-parser.add_argument('file', metavar='WEIGHTS', type=str, help='name of additional mesh file')
+parser.add_argument('file', metavar='MESH', type=str, help='name of additional mesh file')
 args = parser.parse_args()
 
 #

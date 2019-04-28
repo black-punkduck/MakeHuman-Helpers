@@ -31,6 +31,7 @@
 Abstract
 --------
 Skript to create a symmetrical group from right to left or left to right.
+Can also be used to create a complete symmetrical character based on the mirror table
 """
 
 import re
@@ -39,68 +40,81 @@ import json
 import argparse
 import wprint as wp
 
+# check orientation of name and calculate partner name
+#
+def evaluate_side(name):
+    orientation = 'm'
+    partner = ""
+    m = re.search ("(\S+)(left)$", name, re.IGNORECASE)
+    if (m is not None):
+        if m.group(2) == "left":
+            partner = m.group(1) + "right"
+        elif m.group(2) == "Left":
+            partner = m.group(1) + "Right"
+        elif m.group(2) == "LEFT":
+            partner = m.group(1) + "RIGHT"
+        else:
+            print ("unknown pattern " + m.group(2))
+            exit (-1)
+        orientation = 'l'
+
+    if partner == "":
+        m = re.search ("(\S+)(right)$", name, re.IGNORECASE)
+        if (m is not None):
+            if m.group(2) == "right":
+                partner = m.group(1) + "left"
+            elif m.group(2) == "Right":
+                partner = m.group(1) + "Left"
+            elif m.group(2) == "RIGHT":
+                partner = m.group(1) + "LEFT"
+            else:
+                print ("unknown pattern " + m.group(2))
+                exit (-1)
+            orientation = 'r'
+
+    if partner == "":
+        m = re.search ("(\S+)(\.[Ll])$", name)
+        if (m is not None):
+            if m.group(2) == ".l":
+                partner = m.group(1) + ".r"
+            if m.group(2) == ".L":
+                partner = m.group(1) + ".R"
+            orientation = 'l'
+
+    if partner == "":
+        m = re.search ("(\S+)(\.[rR])$", name)
+        if (m is not None):
+            if m.group(2) == ".r":
+                partner = m.group(1) + ".l"
+            if m.group(2) == ".R":
+                partner = m.group(1) + ".L"
+            orientation = 'r'
+
+    if orientation == 'm':
+        partner = name
+    return (orientation, partner)
+
+
 configfilename = "data/mh_helper.json"
 
 parser = argparse.ArgumentParser(description='Create a symmetrical group from right to left or left to right.')
-parser.add_argument('group', metavar='GROUP', type=str, help='name of group')
-parser.add_argument('direction', metavar='DIR', type=str, default='r', nargs='?', choices=['l','r'],
-        help='left or right in case of no indication in group name')
+parser.add_argument('group', metavar='GROUP', type=str, help='name of group or use "=all=" for all groups')
+parser.add_argument('orientation', metavar='ORIENT', type=str, default='l', nargs='?', choices=['l','r'],
+        help='left or right in case of no indication in group name, use this for "=all=" especially (default: l)')
 parser.add_argument('-f', default="", metavar='default_weights', help='use different default weight file (default: see configuration)')
 parser.add_argument('-p', default=4, metavar='PRECISION', type=int,  help='precision of weights (default: 4)')
 parser.add_argument('-c', default=4, metavar='COLUMNS', type=int,  help='number of output columns for weights (default: 4)')
 args = parser.parse_args()
 
-dest = ""
+
 
 #
-# Get symmetrical group in case of pattern name
+# Get symmetrical group in case of pattern name, "=all=" does not contain this pattern
 #
-dirbyname = ''
+(orientation, partner) = evaluate_side(args.group)
 
-m = re.search ("(\S+)(left)$", args.group, re.IGNORECASE)
-if (m is not None):
-    if m.group(2) == "left":
-        dest = m.group(1) + "right"
-    elif m.group(2) == "Left":
-        dest = m.group(1) + "Right"
-    elif m.group(2) == "LEFT":
-        dest = m.group(1) + "RIGHT"
-    else:
-        print ("unknown pattern " + m.group(2))
-        exit (-1)
-    dirbyname = 'l'
-
-if dest == "":
-    m = re.search ("(\S+)(right)$", args.group, re.IGNORECASE)
-    if (m is not None):
-        if m.group(2) == "right":
-            dest = m.group(1) + "left"
-        elif m.group(2) == "Right":
-            dest = m.group(1) + "Left"
-        elif m.group(2) == "RIGHT":
-            dest = m.group(1) + "LEFT"
-        else:
-            print ("unknown pattern " + m.group(2))
-            exit (-1)
-        dirbyname = 'r'
-
-if dest == "":
-    m = re.search ("(\S+)(\.[Ll])$", args.group)
-    if (m is not None):
-        if m.group(2) == ".l":
-            dest = m.group(1) + ".r"
-        if m.group(2) == ".L":
-            dest = m.group(1) + ".R"
-        dirbyname = 'l'
-
-if dest == "":
-    m = re.search ("(\S+)(\.[rR])$", args.group)
-    if (m is not None):
-        if m.group(2) == ".r":
-            dest = m.group(1) + ".l"
-        if m.group(2) == ".R":
-            dest = m.group(1) + ".L"
-        dirbyname = 'r'
+if orientation == "m":
+    orientation = args.orientation
 
 #
 # read configuration
@@ -133,34 +147,51 @@ weights = json.load (cfile)
 cfile.close()
 
 groups =  weights["weights"]
-newgroups = {args.group: {}, dest: {}}
-
-if args.group not in groups.keys():
-    print ("Weightfile does not contain " + args.group)
-    exit(2)
-
-# print (dest + " dirbyname " + dirbyname)
 
 #
-# create same and second group when name is given
+# generate an array with all groups to be mirrored in case of '=all='
+# else check if weightfile has the desired group and create only
+# one task
 #
-if dirbyname != "":
-    for vnum in groups[args.group]:
-        m = mirror[vnum[0]]['m']
-        newgroups[dest][m] =  vnum[1]
-        newgroups[args.group][vnum[0]] =  vnum[1]
-#
-# symmetrize group otherwise
-#
+tasks = {}
+taskcount = 0
+
+if args.group == '=all=':
+    for group in groups.keys():
+        (o, partner) = evaluate_side(group)
+        if o == orientation or o == 'm':
+            tasks[taskcount] = {'group': group, 'orient': o, 'partner': partner}
+            taskcount += 1
 else:
-    for vnum in groups[args.group]:
-        if mirror[vnum[0]]['s'] == args.direction:
-            m = mirror[vnum[0]]['m']
-            newgroups[args.group][vnum[0]] =  vnum[1]
-            newgroups[args.group][m] =  vnum[1]
-        elif mirror[vnum[0]]['s'] == "m":
-            newgroups[args.group][vnum[0]] =  vnum[1]
+    if args.group not in groups.keys():
+        print ("Weightfile does not contain " + args.group)
+        exit(2)
+    (o, partner) = evaluate_side(args.group)
+    tasks[0] = {'group': args.group, 'orient': o, 'partner': partner}
 
+
+newgroups = {}
+
+for task in tasks:
+    group = tasks[task]["group"]
+    partner = tasks[task]["partner"]
+    group_orientation = tasks[task]["orient"]
+    if group_orientation == 'm':
+        newgroups[group] = {}
+        for vnum in groups[group]:
+            if mirror[vnum[0]]['s'] == orientation:
+                m = mirror[vnum[0]]['m']
+                newgroups[group][vnum[0]] =  vnum[1]
+                newgroups[group][m] =  vnum[1]
+            elif mirror[vnum[0]]['s'] == "m":
+                newgroups[group][vnum[0]] =  vnum[1]
+    else:
+        newgroups[group] = {}
+        newgroups[partner] = {}
+        for vnum in groups[group]:
+            m = mirror[vnum[0]]['m']
+            newgroups[partner][m] =  vnum[1]
+            newgroups[group][vnum[0]] =  vnum[1]
 #
 # now output pseudo JSON:
 # we need a shorter form and only the vnum and weights
