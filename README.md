@@ -96,6 +96,7 @@ If GROUP contains *.l*, *.L*, *left*, *Left*, *LEFT* or *.r*, *.R*, *right*, *Ri
 All other groups are made symmetrical depending on a second parameter l or r to tell the program which side is preferred.
 
 The GROUP "=all=" can be used to create identical weights on left and right side. Without ORIENTATION given the left side is copied to the right.
+In case of GROUP "=all=" also the rest of the original JSON file is copyied.
 
 For calculation the program uses the file created by create_mirror_tab.py
 which should be copied to destination specified in the json-configfile.
@@ -182,7 +183,6 @@ This workflow only works, if create_mirror_tab.py is able to create a table, whe
  * change .proxy file so it refers to this mesh 
  * create mirror table (use the .obj file of your proxy)
  * use symmetrize on the .mhw file. Use "=all=" for the GROUP and if you changed the left side Blender, no further parameter is needed. The output should be written into a new file.
- * supply the missing lines (author, copyright) in the new file. (this might be changed in future ...)
  * copy this file to the destinaton directory.
 
 ---

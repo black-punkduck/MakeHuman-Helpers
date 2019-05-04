@@ -97,7 +97,7 @@ def evaluate_side(name):
 
 configfilename = "data/mh_helper.json"
 
-parser = argparse.ArgumentParser(description='Create a symmetrical group from right to left or left to right.')
+parser = argparse.ArgumentParser(description='Create a symmetrical group from right to left or left to right. It is also possible to create a complete symmetric weighted mesh.')
 parser.add_argument('group', metavar='GROUP', type=str, help='name of group or use "=all=" for all groups')
 parser.add_argument('orientation', metavar='ORIENT', type=str, default='l', nargs='?', choices=['l','r'],
         help='left or right in case of no indication in group name, use this for "=all=" especially (default: l)')
@@ -197,7 +197,20 @@ for task in tasks:
 # we need a shorter form and only the vnum and weights
 #
 va = wp.v_array(prec=args.p, mcol=args.c)
-dtext = va.appweights (newgroups)
+
+dtext =""
+
+if args.group == '=all=':
+    dtext += "{\n"
+    for elem in weights:
+        if elem != "weights":
+            dtext += "\"" + elem + "\": " + json.dumps(weights[elem]) + ",\n"
+    dtext += "\"weights\": {\n"
+
+dtext += va.appweights (newgroups)
+
+if args.group == '=all=':
+    dtext += "}\n}\n"
 
 print (dtext, end="")
 exit (0)
