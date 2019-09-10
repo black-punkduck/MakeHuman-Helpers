@@ -56,17 +56,17 @@ def GetMirrorVNum (x, y, z, m):
 
     return (-1);
 
-#
-# read configuration
-#
-cfile = open (configfilename, "r")
-config = json.load (cfile)
-cfile.close()
 
 
 if len(args.b):
     meshfile = args.b
 else:
+    #
+    # read configuration
+    #
+    cfile = open (configfilename, "r")
+    config = json.load (cfile)
+    cfile.close()
     meshfile = config["base_object"]
 
 

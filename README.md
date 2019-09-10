@@ -89,7 +89,7 @@ you will get
 
 A script which creates a symmetric group or symmetrizes an existing one according to the name.
 
-    symmetrize.py [-h] [-f default_weights] [-p PRECISION] [-c COLUMNS] GROUP [ORIENTATION]
+    symmetrize_weights.py [-h] [-f default_weights] [-p PRECISION] [-c COLUMNS] GROUP [ORIENTATION]
 
 If GROUP contains *.l*, *.L*, *left*, *Left*, *LEFT* or *.r*, *.R*, *right*, *Right*, *RIGHT* the mirrored and the original groups are created.
 
@@ -182,7 +182,7 @@ This workflow only works, if create_mirror_tab.py is able to create a table, whe
  * select the mesh and export with Blender exporter for .mhw format
  * change .proxy file so it refers to this mesh 
  * create mirror table (use the .obj file of your proxy)
- * use symmetrize on the .mhw file. Use "=all=" for the GROUP and if you changed the left side Blender, no further parameter is needed. The output should be written into a new file.
+ * use symmetrize_weights on the .mhw file. Use "=all=" for the GROUP and if you changed the left side Blender, no further parameter is needed. The output should be written into a new file.
  * copy this file to the destinaton directory.
 
 ---
