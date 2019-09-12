@@ -44,7 +44,7 @@ configfilename = "data/mh_helper.json"
 parser = argparse.ArgumentParser(description='Create a symmetrical wavefront-file')
 parser.add_argument('objfile', metavar='OBJFILE', type=str, help='wavefront .obj file')
 parser.add_argument('orientation', metavar='ORIENT', type=str, default='l', nargs='?', choices=['l','r'],
-        help='left or right in case of no indication in group name, use this for "=all=" especially (default: l)')
+        help='use left or right side to be mirrored (default: l)')
 parser.add_argument('-m', default="", metavar='mirror_table', help='use different mirror_table (default: see configuration)')
 args = parser.parse_args()
 
@@ -64,7 +64,7 @@ else:
     cfile = open (configfilename, "r")
     config = json.load (cfile)
     cfile.close()
-    mirrorfilename = config["default_weights"]
+    mirrorfilename = config["mirror_vertices"]
 
 mirror = {} # for mirroring
 vcnt   = {} # for counting only to figure out completeness

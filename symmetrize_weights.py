@@ -102,6 +102,7 @@ parser.add_argument('group', metavar='GROUP', type=str, help='name of group or u
 parser.add_argument('orientation', metavar='ORIENT', type=str, default='l', nargs='?', choices=['l','r'],
         help='left or right in case of no indication in group name, use this for "=all=" especially (default: l)')
 parser.add_argument('-f', default="", metavar='default_weights', help='use different default weight file (default: see configuration)')
+parser.add_argument('-m', default="", metavar='mirror_table', help='use different default mirror table (default: see configuration)')
 parser.add_argument('-p', default=4, metavar='PRECISION', type=int,  help='precision of weights (default: 4)')
 parser.add_argument('-c', default=4, metavar='COLUMNS', type=int,  help='number of output columns for weights (default: 4)')
 args = parser.parse_args()
@@ -119,15 +120,27 @@ if orientation == "m":
 #
 # read configuration
 #
-cfile = open (configfilename, "r")
-config = json.load (cfile)
-cfile.close()
+if not (len(args.m) and len(args.f)):
+    cfile = open (configfilename, "r")
+    config = json.load (cfile)
+    cfile.close()
+
+if len(args.m):
+    mirrorfilename = args.m
+else:
+    mirrorfilename = config["mirror_vertices"]
+
+if len(args.f):
+    weightfilename = args.f
+else:
+    weightfilename = config["default_weights"]
+
 
 mirror = {}
 #
 # read mirror vertices
 #
-with open(config["mirror_vertices"]) as f:
+with open(mirrorfilename) as f:
     for line in f:
         m=re.search("(\d+)\s+(\d+)\s+(\w+)", line)
         if (m is not None):
@@ -137,11 +150,6 @@ with open(config["mirror_vertices"]) as f:
 #
 # read weight-file
 #
-if len(args.f):
-    weightfilename = args.f
-else:
-    weightfilename = config["default_weights"]
-
 cfile = open (weightfilename, "r")
 weights = json.load (cfile)
 cfile.close()
