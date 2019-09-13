@@ -38,21 +38,33 @@ import re
 import sys
 import json
 import argparse
+import math
 
 configfilename = "data/mh_helper.json"
 
-parser = argparse.ArgumentParser(description='Create a table with all vertex number and mirror vertices and orientation.')
+parser = argparse.ArgumentParser(description='Create a table with all vertex number and mirror vertices and orientation. Maximum deviation is 0.05')
 parser.add_argument('-b', default="", metavar='base_object', help='an optional base mesh in .obj format (default: see configuration)')
-parser.add_argument('-m', default=0.0, metavar='MAXDIST', type=float,  help='maximum deviation allowed for being considered as a mirrored vertex')
+parser.add_argument('-m', default=0.05, metavar='MAXDIST', type=float,  help='maximum deviation allowed for being considered as a mirrored vertex. Should be lower than 0.05')
 args = parser.parse_args()
 
 mirror = {}
 
-def GetMirrorVNum (x, y, z, m):
-    for vnum in mirror.keys():
-        if (abs(mirror[vnum]["x"] + x)) <= args.m and abs((mirror[vnum]["y"] - y)) <= args.m and abs((mirror[vnum]["z"] - z)) <= args.m:
-            mirror[vnum]["m"] = m
-            return (vnum)
+def GetMirrorVNum (x, y, z, m, eps):
+    if (eps == 0):
+        for vnum in mirror.keys():
+            if mirror[vnum]["m"] == -1 and mirror[vnum]["x"] == -x and mirror[vnum]["y"] == y and mirror[vnum]["z"] ==  z:
+                mirror[vnum]["m"] = m
+                return (vnum)
+    else:
+        for vnum in mirror.keys():
+            if mirror[vnum]["m"] == -1:
+                dx = abs(mirror[vnum]["x"] + x)
+                dy = abs(mirror[vnum]["y"] - y)
+                dz = abs(mirror[vnum]["z"] - z)
+                dist = math.sqrt (dx * dx + dy * dy + dz * dz)
+                if dist <= eps:
+                    mirror[vnum]["m"] = m
+                    return (vnum)
 
     return (-1);
 
@@ -85,23 +97,31 @@ print (str(vnum) + " vertices processed", file=sys.stderr)
 
 # now calculate mirror
 
-unmirrored = 0
-for i in range (0, vnum):
-    if mirror[i]["m"] == -1:
-        mirror[i]["m"] = GetMirrorVNum ( mirror[i]["x"], mirror[i]["y"], mirror[i]["z"], i)
-        if ( mirror[i]["m"] == -1):
-            unmirrored +=1 
+still_unmirrored = True
+for eps in [0, 0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05]:
+    if still_unmirrored and eps <= args.m:
+        print ("epsilon " + str(eps) + ": ",  file=sys.stderr, end='')
+        sys.stderr.flush()
 
-print (str(unmirrored) + " unmirrored vertices", file=sys.stderr)
+        unmirrored = 0
+        for i in range (0, vnum):
+            if mirror[i]["m"] == -1:
+                mirror[i]["m"] = GetMirrorVNum ( mirror[i]["x"], mirror[i]["y"], mirror[i]["z"], i, eps)
+                if ( mirror[i]["m"]  == -1):
+                    unmirrored +=1 
+        print (str(unmirrored) + " unmirrored vertices", file=sys.stderr)
+        if unmirrored == 0:
+            still_unmirrored = False
+
 
 # print the result
 
 for i in range (0, vnum):
     pos = 'l'
-    if mirror[i]["x"] < 0:
-        pos = 'r'
-    elif mirror[i]["x"] == 0.0:
+    if mirror[i]["m"] == i:
         pos = 'm'
+    elif mirror[i]["x"] < 0:
+         pos = 'r'
     print (str(i) + " " + str(mirror[i]["m"]) + " " + pos )
 
 exit (0)
