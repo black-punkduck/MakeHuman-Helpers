@@ -28,19 +28,21 @@
 Abstract
 --------
 this plugin should be copied to standard addons directory of blender.
-to test it, select e.g. the skin (body) of a MakeHuman character with skeleton
+to test export, select e.g. the skin (body) of a MakeHuman character with skeleton
 and use file / export / MakeHuman Weight (.mhw)
 
-this program works with all meshes with at least one vertex group and at least a vertex assigned
+export works with all meshes with at least one vertex group and at least a vertex assigned
+
+to test import throw vertices away and import it on the same mesh.
 """
 
 bl_info = {
-    "name": "Export MHW",
+    "name": "Import/Export MHW",
     "author": "black-punkduck",
-    "version": (2019, 4, 27),
+    "version": (2019, 9, 15),
     "blender": (2, 79, 0),
     "location": "File > Export > MakeHuman Weightfile",
-    "description": "Export a MakeHuman weightfile (.mhw) based on vertex groups",
+    "description": "Import and Export a MakeHuman weightfile (.mhw) based on vertex groups",
     "warning": "",
     "wiki_url": "",
     "tracker_url": "",
@@ -49,7 +51,8 @@ bl_info = {
 import os, struct, math
 import mathutils
 import bpy
-import bpy_extras.io_utils
+import json
+from bpy_extras.io_utils import (ImportHelper, ExportHelper)
 
 class v_array:
     def __init__(self, prec=4, mcol=4):
@@ -105,17 +108,9 @@ def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
 
     bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
 
-def exportMHW(context, file, props):
+def export_weights (context, props):
     bpy.ops.object.mode_set(mode='OBJECT')
     active = context.active_object
-    #print (active.name)
-    if active == None:
-        ShowMessageBox("No object selected", "Invalid selection", 'ERROR')
-        return
-
-    if active.type != "MESH":
-        ShowMessageBox("object is not a mesh", "Invalid selection", 'ERROR')
-        return
 
     vgrp = active.vertex_groups
 
@@ -159,11 +154,35 @@ def exportMHW(context, file, props):
         "\"version\": " + props.version + ",\n" + \
         "\"weights\": {\n" + va.appweights (outverts) + "}\n}\n"
 
-    fp=open(file, 'w')
+    fp=open(props.filepath, 'w')
     fp.write (text)
     fp.close()
 
-class ExportMHW(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
+def import_weights (context, props):
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    fp = open(props.filepath, "r")
+    weights = json.load(fp)
+    fp.close
+
+    ob = context.active_object
+    ogroups = ob.vertex_groups
+
+    groups = weights["weights"]
+
+    vn = [1]
+    for group in groups.keys():
+        if group in ogroups:
+            if props.replace:
+                ogroups.remove(ogroups[group])
+        vgrp = ogroups.new(group)
+        for val in groups[group]:
+            # print ("Vertexnum: " + str(val[0]) + " Value: " + str(val[1]))
+            vn[0] = val[0]
+            vgrp.add(vn, val[1], 'ADD')
+    return
+
+class ExportMHW(bpy.types.Operator, ExportHelper):
     '''Export an MHW File'''
     bl_idname = "export.mhw"
     bl_label = 'Export MHW'
@@ -177,52 +196,61 @@ class ExportMHW(bpy.types.Operator, bpy_extras.io_utils.ExportHelper):
     columns     = bpy.props.IntProperty(name="Columns", min=1, max=16, description="Columns in weightfile", default=4)
     version     = bpy.props.StringProperty(name="Version", description="MakeHuman version", maxlen=20, default="110")
 
-    def invoke (self, context,event):
-        active = None
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH"
 
-        if hasattr(context, 'active_object'):
-            active = context.active_object
-
-        name = ""
-        desc = ""
-        if active != None:
-            name   = active.name
-            desc   = "generated weights for " + name
-        self.properties.name = name
-        self.properties.description = desc
-        return bpy_extras.io_utils.ExportHelper.invoke(self, context, event)
-
+    def invoke(self, context,event):
+        self.properties.name = context.active_object.name
+        self.properties.description = "generated weights for " + self.properties.name
+        return super().invoke(context, event)
 
     def execute(self, context):
-
-        active = None
-
-        if hasattr(context, 'active_object'):
-            active = context.active_object
-
-        name = ""
-        desc = ""
-        if active != None:
-            name   = active.name
-            desc   = "generated weights for " + name
-
-        self.properties.name = name
-        self.properties.description = desc
-
-        exportMHW(context, self.properties.filepath, self.properties)
+        export_weights(context, self.properties)
         return {'FINISHED'}
 
-def menu_func(self, context):
+class ImportMHW(bpy.types.Operator, ImportHelper):
+    '''Import an MHW File'''
+    bl_idname = "import.mhw"
+    bl_label = 'Import MHW'
+    filename_ext = ".mhw"
+
+    replace   = bpy.props.BoolProperty(name="Replace Groups", description="Replace or append vertex group", default=True)
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH"
+
+    def invoke(self, context,event):
+        return super().invoke(context, event)
+
+    def draw (self, context):
+        layout = self.layout
+        layout.label("Create weights on: " + context.active_object.name)
+        layout.prop(self, "replace")
+
+    def execute(self, context):
+        import_weights(context, self.properties)
+        return {'FINISHED'}
+
+def export_func(self, context):
     self.layout.operator(ExportMHW.bl_idname, text="MakeHuman Weights (.mhw)")
+
+def import_func(self, context):
+    self.layout.operator(ImportMHW.bl_idname, text="MakeHuman Weights (.mhw)")
 
 
 def register():
     bpy.utils.register_module(__name__)
-    bpy.types.INFO_MT_file_export.append(menu_func)
+    bpy.types.INFO_MT_file_export.append(export_func)
+    bpy.types.INFO_MT_file_import.append(import_func)
 
 def unregister():
     bpy.utils.unregister_module(__name__)
-    bpy.types.INFO_MT_file_export.remove(menu_func)
+    bpy.types.INFO_MT_file_export.remove(export_func)
+    bpy.types.INFO_MT_file_import.remove(import_func)
 
 
 if __name__ == "__main__":
