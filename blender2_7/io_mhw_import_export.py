@@ -39,7 +39,7 @@ to test import throw vertices away and import it on the same mesh.
 bl_info = {
     "name": "Import/Export MHW",
     "author": "black-punkduck",
-    "version": (2019, 9, 15),
+    "version": (2019, 9, 18),
     "blender": (2, 79, 0),
     "location": "File > Export > MakeHuman Weightfile",
     "description": "Import and Export a MakeHuman weightfile (.mhw) based on vertex groups",
@@ -48,11 +48,14 @@ bl_info = {
     "tracker_url": "",
     "category": "MakeHuman"}
 
-import os, struct, math
+import re, os, struct, math
 import mathutils
 import bpy
+import bmesh
 import json
 from bpy_extras.io_utils import (ImportHelper, ExportHelper)
+
+mirror = {};
 
 class v_array:
     def __init__(self, prec=4, mcol=4):
@@ -107,6 +110,18 @@ def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
         self.layout.label(message)
 
     bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+
+def read_mirror_tab (name):
+    try:
+        f = open(name)
+        for line in f:
+            m=re.search("(\d+)\s+(\d+)\s+(\w+)", line)
+            if (m is not None):
+                mirror[int (m.group(1))] = { 'm': int(m.group(2)), 's': m.group(3) }
+        f.close()
+        return True
+    except IOError:
+        return False
 
 def export_weights (context, props):
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -182,6 +197,9 @@ def import_weights (context, props):
             vgrp.add(vn, val[1], 'ADD')
     return
 
+def mirror_weights (context, props):
+    pass
+
 class ExportMHW(bpy.types.Operator, ExportHelper):
     '''Export an MHW File'''
     bl_idname = "export.mhw"
@@ -235,22 +253,103 @@ class ImportMHW(bpy.types.Operator, ImportHelper):
         import_weights(context, self.properties)
         return {'FINISHED'}
 
+class MIRRORMESH_OT_mesh_by_table(bpy.types.Operator):
+    '''Mirror a mesh using a table'''
+    bl_idname = "mirror.mesh_by_table"
+    bl_label = 'Mirror Mesh using a table'
+    bl_options = {'REGISTER'}
+
+    filename = bpy.props.StringProperty(name="Filename", description="Name of the mirror table", maxlen=256, default="")
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH"
+
+    def draw(self, context):
+        obj = context.object
+        layout = self.layout
+        try: 
+            mirrortab = obj['mirrortable']
+        except:
+            layout.prop(self, "filename")
+        else:
+            layout.label("Using table: " + mirrortab)
+            
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        print ("Select the other side")
+        obj = context.object
+        try: 
+            mirrortab = obj['mirrortable']
+        except:
+            mirrortab = self.properties.filename
+            obj['mirrortable'] = mirrortab
+        if read_mirror_tab (mirrortab) is False:
+            ShowMessageBox("Cannot load " + mirrortab, "Mirror Table Mismatch", 'ERROR')
+            return {'CANCELLED'}
+
+        bpy.ops.mesh.select_mode(type="VERT")
+        me = obj.data
+        bm = bmesh.from_edit_mesh(me)
+
+        # we need to remember the values
+        for vert in bm.verts:
+            if vert.index in mirror:
+                mirror[vert.index]['o'] = vert.select
+            else:
+                ShowMessageBox("mirrortable too short", "Mirror Table Mismatch", 'ERROR')
+                return {'CAŃCELLED'}
+
+
+        # now select the mirrored ones
+        for vert in bm.verts:
+            try:
+                vert.select = mirror[mirror[vert.index]['m']]['o']
+            except:
+                ShowMessageBox("mirrortable does not fit", "Mirror Table Mismatch", 'ERROR')
+                return {'CANCELLED'}
+
+        # recalculate edges
+        for edge in bm.edges:
+            if edge.verts[0].select and edge.verts[1].select:
+                edge.select = True
+
+        # recalculate faces
+        for face in bm.faces:
+            b = True
+            for edges in face.edges:
+                b &= edges.select
+            if b:
+                face.select = b
+        bmesh.update_edit_mesh(me, True)
+        return {'FINISHED'}
+
 def export_func(self, context):
     self.layout.operator(ExportMHW.bl_idname, text="MakeHuman Weights (.mhw)")
 
 def import_func(self, context):
     self.layout.operator(ImportMHW.bl_idname, text="MakeHuman Weights (.mhw)")
 
+def mirror_func(self, context):
+    self.layout.operator("mirror.mesh_by_table", text="Mirror Mesh by table")
 
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_file_export.append(export_func)
     bpy.types.INFO_MT_file_import.append(import_func)
+    #bpy.utils.register_class(MIRRORMESH_OT_mesh_by_table)
+    bpy.types.VIEW3D_MT_select_edit_mesh.prepend(mirror_func)
 
 def unregister():
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_file_export.remove(export_func)
     bpy.types.INFO_MT_file_import.remove(import_func)
+    #bpy.utils.unregister_class(MIRRORMESH_OT_mesh_by_table)
+    bpy.types.VIEW3D_MT_select_edit_mesh.remove(mirror_func)
 
 
 if __name__ == "__main__":
