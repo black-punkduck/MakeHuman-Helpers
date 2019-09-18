@@ -18,7 +18,10 @@ The configuration also contains the start vertices of the helpers.
 
 ## Create mirror table
 
-A small skript to create a mirror table of vertices from a symmetric (y-axis) wavefront (.obj) file. This table is used for symmetrizing objects. Normally a deviation (MAXDIST) of 0.0 is allowed. If you edit your mesh in mirror mode set deviation to e.g. 0.001.
+A small skript to create a mirror table of vertices from a symmetric (y-axis) wavefront (.obj) file. This table is used for symmetrizing objects (x <=> -x). Normally a deviation (MAXDIST) of 0.05 is allowed. The script starts with exact mirror, then 0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02 and 0.05. All vertices which have a mirrored partner are taken out of
+consideration. The Euclidian distance is used. A vertex near the mirror axis, which seems to be its own mirror, is correct to x=0.
+
+If you want to reduce MAXDIST set deviation to e.g. 0.005.
 
     create_mirror_tab.py [-h] [-b base_object] [-m MAXDIST]
 
@@ -89,7 +92,7 @@ you will get
 
 A script which creates a symmetric group or symmetrizes an existing one according to the name.
 
-    symmetrize_weights.py [-h] [-f default_weights] [-p PRECISION] [-c COLUMNS] GROUP [ORIENTATION]
+    symmetrize_weights.py [-h] [-f default_weights] [-m mirror_table] [-p PRECISION] [-c COLUMNS] GROUP [ORIENTATION]
 
 If GROUP contains *.l*, *.L*, *left*, *Left*, *LEFT* or *.r*, *.R*, *right*, *Right*, *RIGHT* the mirrored and the original groups are created.
 
@@ -98,8 +101,22 @@ All other groups are made symmetrical depending on a second parameter l or r to 
 The GROUP "=all=" can be used to create identical weights on left and right side. Without ORIENTATION given the left side is copied to the right.
 In case of GROUP "=all=" also the rest of the original JSON file is copyied.
 
-For calculation the program uses the file created by create_mirror_tab.py
+For calculation the program uses the mirror_table specified with -m or the file created by create_mirror_tab.py
 which should be copied to destination specified in the json-configfile.
+
+---
+## Creation of a 100% symmetric wavefront file
+
+A script which creates a symmetric geometry for a wavefront obj-file. 
+
+	symmetrize_geom.py [-h] [-m mirror_table] OBJFILE [ORIENT]
+	
+Without mentioning the mirror_table the table out of the json-configfile is used. The orientatin should be l or r. l is default. The file is printed to stdout. 
+
+Example:
+
+	symmetrize_geom.py -m mirror_duck.txt duck.obj l >duck2.obj
+
 
 ---
 ## Merging weights
@@ -137,17 +154,26 @@ Instead of writing only the incorrect lines this command creates the normalized 
 Best to be used with a higher DIFFERENCE e.g. 0.005
 
 ---
-## Blender exporter in .mhw format
+## Blender addons, import or export vertex-group values in .mhw format
 
-The Blender plugin mhw_export.py should be copied to standard addons directory of Blender.
-It will appear in the preferences, category MakeHuman. Tested in 2.79
+In the subdirectory blender2_7 and blender2_8 you will find both versions of io_mhw_import_export.py
 
-To test it, select e.g. the skin (body) of a MakeHuman character (must be supplied with a skeleton)
-and use file / export / MakeHuman Weight (.mhw)
+The Blender plugin should be copied to standard addons directory of Blender.
+It will appear in the preferences, category MakeHuman. Tested in 2.79 and 2.80
 
-This plugin works with all meshes with at least one vertex group and at least a vertex assigned.
+It will add a file menu entry (in Blender 2.8 it is in the top bar, in 2.79 in the info bar)
 
-Consider this as beta-version. An ASCII file is generated.
+To test it in export mode, select e.g. the skin (body) of a MakeHuman character (must be supplied with a skeleton)
+and use file / export / MakeHuman Weight (.mhw). Or create a cube with only one vertexgroup and assign the vertices to a value.
+
+This plugin works with all meshes with at least one vertex group and at least a vertex assigned. An ASCII file (JSON) is generated, simply view the result with an editor.
+
+Consider this as alpha1-version.
+
+To test the file, delete the vertex groups and re-read it. If you don't delete the groups and unmark "replace", you will get a second <group>.001
+
+At the moment, until the other functions will not be part of blender itself, this is my simplest way to interchange the weight
+and also to symmetrize them.
 
 ---
 
