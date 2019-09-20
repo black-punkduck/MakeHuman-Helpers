@@ -29,30 +29,99 @@ Abstract
 --------
 this plugin should be copied to standard addons directory of blender.
 to test export, select e.g. the skin (body) of a MakeHuman character with skeleton
-and use file / export / MakeHuman Weight (.mhw)
+and use file > export > MakeHuman Weights (.mhw)
 
 export works with all meshes with at least one vertex group and at least a vertex assigned
 
 to test import throw vertices away and import it on the same mesh.
+
+to test the mirror function you have to assign a mirror table to the object
+
+use edit mode
+    mesh > vertices > assign mirror table
+
+mirror selection in edit mode
+    select > Mirror Mesh by Table
+
+mirror vertex groups (edit mode .. switches to object mode)
+    mesh > mirror > Mirror Vertex Groups by Table (L>R)   
+    mesh > mirror > Mirror Vertex Groups by Table (R>L)   
 """
 
 bl_info = {
-    "name": "Import/Export MHW",
+    "name": "MakeHuman Weighting",
     "author": "black-punkduck",
-    "version": (2019, 9, 15),
+    "version": (2019, 9, 20),
     "blender": (2, 80, 0),
     "location": "File > Export > MakeHuman Weightfile",
-    "description": "Import and Export a MakeHuman weightfile (.mhw) based on vertex groups",
+    "description": "Import and Export a MakeHuman weightfile (.mhw), Mirroring using a mirror-table",
     "warning": "",
     "wiki_url": "",
     "tracker_url": "",
     "category": "MakeHuman"}
 
-import os, struct, math
+import re, os, struct, math
 import mathutils
 import bpy
+import bmesh
 import json
 from bpy_extras.io_utils import (ImportHelper, ExportHelper)
+
+mirror = {};
+
+# check orientation of name and calculate partner name
+#
+def evaluate_side(name):
+    orientation = 'm'
+    partner = ""
+    m = re.search ("(\S+)(left)$", name, re.IGNORECASE)
+    if (m is not None):
+        if m.group(2) == "left":
+            partner = m.group(1) + "right"
+        elif m.group(2) == "Left":
+            partner = m.group(1) + "Right"
+        elif m.group(2) == "LEFT":
+            partner = m.group(1) + "RIGHT"
+        else:
+            print ("unknown pattern " + m.group(2))
+            exit (-1)
+        orientation = 'l'
+
+    if partner == "":
+        m = re.search ("(\S+)(right)$", name, re.IGNORECASE)
+        if (m is not None):
+            if m.group(2) == "right":
+                partner = m.group(1) + "left"
+            elif m.group(2) == "Right":
+                partner = m.group(1) + "Left"
+            elif m.group(2) == "RIGHT":
+                partner = m.group(1) + "LEFT"
+            else:
+                print ("unknown pattern " + m.group(2))
+                exit (-1)
+            orientation = 'r'
+
+    if partner == "":
+        m = re.search ("(\S+)(\.[Ll])$", name)
+        if (m is not None):
+            if m.group(2) == ".l":
+                partner = m.group(1) + ".r"
+            if m.group(2) == ".L":
+                partner = m.group(1) + ".R"
+            orientation = 'l'
+
+    if partner == "":
+        m = re.search ("(\S+)(\.[rR])$", name)
+        if (m is not None):
+            if m.group(2) == ".r":
+                partner = m.group(1) + ".l"
+            if m.group(2) == ".R":
+                partner = m.group(1) + ".L"
+            orientation = 'r'
+
+    if orientation == 'm':
+        partner = name
+    return (orientation, partner)
 
 class v_array:
     def __init__(self, prec=4, mcol=4):
@@ -104,9 +173,21 @@ class v_array:
 def ShowMessageBox(message = "", title = "Message Box", icon = 'INFO'):
 
     def draw(self, context):
-        self.layout.label(message)
+        self.layout.label(text=message)
 
     bpy.context.window_manager.popup_menu(draw, title = title, icon = icon)
+
+def read_mirror_tab (name):
+    try:
+        f = open(name)
+        for line in f:
+            m=re.search("(\d+)\s+(\d+)\s+(\w+)", line)
+            if (m is not None):
+                mirror[int (m.group(1))] = { 'm': int(m.group(2)), 's': m.group(3) }
+        f.close()
+        return True
+    except IOError:
+        return False
 
 def export_weights (context, props):
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -182,6 +263,91 @@ def import_weights (context, props):
             vgrp.add(vn, val[1], 'ADD')
     return
 
+#
+# mirror the vertex groups
+#
+# direction will be 'l' or 'r' which is the source-side
+#
+def mirror_vgroups (context, direction):
+    # print ("in mirror vgroups " + direction)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    ob = context.active_object
+    vgrp = ob.vertex_groups
+
+    # load mirrored table
+    #
+    mirrortab = ob['mirrortable']
+    if read_mirror_tab (mirrortab) is False:
+        ShowMessageBox("Cannot load " + mirrortab, "Mirror Table Mismatch", 'ERROR')
+        return {'CANCELLED'}
+
+    # delete all groups of destination side
+    #   
+    for grp in sorted(vgrp.keys()):
+        (orientation, partner) = evaluate_side(grp)
+        if orientation != 'm' and orientation != direction:
+            # print ("delete group " + grp)
+            vg = ob.vertex_groups.get(grp)
+            ob.vertex_groups.remove(vg)
+
+    # now create mirrored groups and symmetrize mid ones
+    #
+    vn = [1]    # our small array ;-)
+
+    for grp in sorted(vgrp.keys()):
+        #
+        # read the group in temporary dictionary
+        #
+        temp={}
+        dgrp = ob.vertex_groups
+        gindex = dgrp[grp].index
+        for v in ob.data.vertices:
+            for g in v.groups:
+
+                # if the index of the group fits to the current group
+                # get the weight of the vertex
+                if g.group == gindex:
+                    temp[v.index] = dgrp[grp].weight(v.index)
+
+        # now check what to do
+        #
+        (orientation, partner) = evaluate_side(grp)
+        if orientation == 'm':
+
+            # this is a group which need to be mirrored on the x-axis
+            # delete and recreate it (did not find an "empty") function
+            #
+            # print ("Symmetrize " + grp)
+            vg = ob.vertex_groups.get(grp)
+            ob.vertex_groups.remove(vg)
+            ngrp = vgrp.new(name=grp)
+
+            # now create the symmetric group use the same weight for both
+            # values in case of the table has the same direction, if it is on
+            # mid line use it once
+            #
+            for index in temp:
+                if mirror[index]['s'] == direction:
+                    vn[0] = index
+                    ngrp.add(vn, temp[index], 'ADD')
+                    vn[0] = mirror[index]['m']
+                    ngrp.add(vn, temp[index], 'ADD')
+                elif mirror[index]['s'] == 'm':
+                    vn[0] = index
+                    ngrp.add(vn, temp[index], 'ADD')
+        else:
+            # in case of a left or right group create the identical partner
+            # using identical weights
+            #
+            #print ("Creating Partner " + partner)
+            ngrp = vgrp.new(name=partner)
+
+            for index in temp:
+                vn[0] = mirror[index]['m']
+                ngrp.add(vn, temp[index], 'ADD')
+
+    return {'FINISHED'}
+
 class ExportMHW(bpy.types.Operator, ExportHelper):
     '''Export an MHW File'''
     bl_idname = "export.mhw"
@@ -235,24 +401,166 @@ class ImportMHW(bpy.types.Operator, ImportHelper):
         import_weights(context, self.properties)
         return {'FINISHED'}
 
+class MIRRORMESH_assign_mirrortab(bpy.types.Operator, ImportHelper):
+    '''Assign a mirror table to object'''
+    bl_idname = "mirror.assign_tab"
+    bl_label = 'Assign a Mirror table to a mesh'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH"
+
+    def draw(self, context):
+        obj = context.object
+        layout = self.layout
+        try: 
+            mirrortab = obj['mirrortable']
+        except:
+            mirrortab = "none"
+        layout.label(text="Current table:")
+        layout.label(text=mirrortab)
+            
+
+    def invoke(self, context, event):
+        return super().invoke(context, event)
+
+    def execute(self, context):
+        obj = context.object
+        obj['mirrortable'] = self.properties.filepath
+        return {'FINISHED'}
+
+class MIRRORMESH_vgroups_by_table_lr(bpy.types.Operator):
+    '''Mirror Vertex Groups using a table from left to right'''
+    bl_idname = "mirror.vgroups_by_table_lr"
+    bl_label = 'Mirror Mesh using a table from left to right'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and 'mirrortable' in obj
+
+    def execute(self, context):
+        mirror_vgroups(context, "l")
+        return  {'FINISHED'}
+
+class MIRRORMESH_vgroups_by_table_rl(bpy.types.Operator):
+    '''Mirror Vertex Groups using a table from right to left'''
+    bl_idname = "mirror.vgroups_by_table_rl"
+    bl_label = 'Mirror Vertex Groups using a table from right to left'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and 'mirrortable' in obj
+
+    def execute(self, context):
+        mirror_vgroups(context, "r")
+        return  {'FINISHED'}
+
+class MIRRORMESH_mesh_by_table(bpy.types.Operator):
+    '''Mirror a mesh using a table'''
+    bl_idname = "mirror.mesh_by_table"
+    bl_label = 'Mirror Mesh using a table'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and 'mirrortable' in obj
+
+    def execute(self, context):
+        print ("Select the other side")
+        obj = context.object
+        mirrortab = obj['mirrortable']
+        if read_mirror_tab (mirrortab) is False:
+            ShowMessageBox("Cannot load " + mirrortab, "Mirror Table Mismatch", 'ERROR')
+            return {'CANCELLED'}
+
+        bpy.ops.mesh.select_mode(type="VERT")
+        me = obj.data
+        bm = bmesh.from_edit_mesh(me)
+
+        # we need to remember the values
+        for vert in bm.verts:
+            if vert.index in mirror:
+                mirror[vert.index]['o'] = vert.select
+            else:
+                ShowMessageBox("mirrortable too short", "Mirror Table Mismatch", 'ERROR')
+                return {'CAŃCELLED'}
+
+
+        # now select the mirrored ones
+        for vert in bm.verts:
+            try:
+                vert.select = mirror[mirror[vert.index]['m']]['o']
+            except:
+                ShowMessageBox("mirrortable does not fit", "Mirror Table Mismatch", 'ERROR')
+                return {'CANCELLED'}
+
+        # recalculate edges
+        for edge in bm.edges:
+            if edge.verts[0].select and edge.verts[1].select:
+                edge.select = True
+
+        # recalculate faces
+        for face in bm.faces:
+            b = True
+            for edges in face.edges:
+                b &= edges.select
+            if b:
+                face.select = b
+        bmesh.update_edit_mesh(me, True)
+        return {'FINISHED'}
+
 def export_func(self, context):
     self.layout.operator(ExportMHW.bl_idname, text="MakeHuman Weights (.mhw)")
 
 def import_func(self, context):
     self.layout.operator(ImportMHW.bl_idname, text="MakeHuman Weights (.mhw)")
 
+def assign_mirrortab_func(self, context):
+    self.layout.operator("mirror.assign_tab", text="Assign Mirror Table")
+
+def mirror_select_func(self, context):
+    self.layout.operator("mirror.mesh_by_table", text="Mirror Mesh by Table")
+
+def mirror_vgroups_left2right_func(self, context):
+    self.layout.operator("mirror.vgroups_by_table_lr", text="Mirror Vertex Groups by Table (L>R)")
+
+def mirror_vgroups_right2left_func(self, context):
+    self.layout.operator("mirror.vgroups_by_table_rl", text="Mirror Vertex Groups by Table (R>L)")
 
 def register():
     bpy.utils.register_class(ExportMHW)
     bpy.utils.register_class(ImportMHW)
+    bpy.utils.register_class (MIRRORMESH_mesh_by_table)
+    bpy.utils.register_class (MIRRORMESH_assign_mirrortab)
+    bpy.utils.register_class (MIRRORMESH_vgroups_by_table_rl)
+    bpy.utils.register_class (MIRRORMESH_vgroups_by_table_lr)
     bpy.types.TOPBAR_MT_file_export.append(export_func)
     bpy.types.TOPBAR_MT_file_import.append(import_func)
+    bpy.types.VIEW3D_MT_edit_mesh_vertices.append(assign_mirrortab_func)
+    bpy.types.VIEW3D_MT_select_edit_mesh.prepend(mirror_select_func)
+    bpy.types.VIEW3D_MT_mirror.append(mirror_vgroups_left2right_func)
+    bpy.types.VIEW3D_MT_mirror.append(mirror_vgroups_right2left_func)
 
 def unregister():
     bpy.utils.unregister_class(ExportMHW)
     bpy.utils.unregister_class(ImportMHW)
+    bpy.utils.unregister_class (MIRRORMESH_mesh_by_table)
+    bpy.utils.unregister_class (MIRRORMESH_assign_mirrortab)
+    bpy.utils.unregister_class (MIRRORMESH_vgroups_by_table_rl)
+    bpy.utils.unregister_class (MIRRORMESH_vgroups_by_table_lr)
     bpy.types.TOPBAR_MT_file_export.remove(export_func)
     bpy.types.TOPBAR_MT_file_import.remove(import_func)
+    bpy.types.VIEW3D_MT_edit_mesh_vertices.remove(assign_mirrortab_func)
+    bpy.types.VIEW3D_MT_select_edit_mesh.remove(mirror_select_func)
+    bpy.types.VIEW3D_MT_mirror.remove(mirror_vgroups_left2right_func)
+    bpy.types.VIEW3D_MT_mirror.remove(mirror_vgroups_right2left_func)
 
 
 if __name__ == "__main__":
