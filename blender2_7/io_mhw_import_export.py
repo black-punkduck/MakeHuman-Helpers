@@ -51,7 +51,7 @@ mirror vertex groups (edit mode .. switches to object mode)
 bl_info = {
     "name": "MakeHuman Weighting",
     "author": "black-punkduck",
-    "version": (2019, 9, 20),
+    "version": (2019, 9, 21),
     "blender": (2, 79, 0),
     "location": "File > Export > MakeHuman Weightfile",
     "description": "Import and Export a MakeHuman weightfile (.mhw), Mirroring using a mirror-table",
@@ -78,28 +78,30 @@ def evaluate_side(name):
     if (m is not None):
         if m.group(2) == "left":
             partner = m.group(1) + "right"
+            orientation = 'l'
         elif m.group(2) == "Left":
             partner = m.group(1) + "Right"
+            orientation = 'l'
         elif m.group(2) == "LEFT":
             partner = m.group(1) + "RIGHT"
+            orientation = 'l'
         else:
-            print ("unknown pattern " + m.group(2))
-            exit (-1)
-        orientation = 'l'
+            partner = name
 
     if partner == "":
         m = re.search ("(\S+)(right)$", name, re.IGNORECASE)
         if (m is not None):
             if m.group(2) == "right":
                 partner = m.group(1) + "left"
+                orientation = 'r'
             elif m.group(2) == "Right":
                 partner = m.group(1) + "Left"
+                orientation = 'r'
             elif m.group(2) == "RIGHT":
                 partner = m.group(1) + "LEFT"
+                orientation = 'r'
             else:
-                print ("unknown pattern " + m.group(2))
-                exit (-1)
-            orientation = 'r'
+                partner = name
 
     if partner == "":
         m = re.search ("(\S+)(\.[Ll])$", name)
@@ -188,6 +190,74 @@ def read_mirror_tab (name):
         return True
     except IOError:
         return False
+
+def GetMirrorVNum (x, y, z, m, eps):
+    if (eps == 0):
+        for vnum in mirror.keys():
+            if mirror[vnum]["m"] == -1 and mirror[vnum]["x"] == -x and mirror[vnum]["y"] == y and mirror[vnum]["z"] ==  z:
+                mirror[vnum]["m"] = m
+                return (vnum)
+    else:
+        for vnum in mirror.keys():
+            if mirror[vnum]["m"] == -1:
+                dx = abs(mirror[vnum]["x"] + x)
+                dy = abs(mirror[vnum]["y"] - y)
+                dz = abs(mirror[vnum]["z"] - z)
+                dist = math.sqrt (dx * dx + dy * dy + dz * dz)
+                if dist <= eps:
+                    mirror[vnum]["m"] = m
+                    return (vnum)
+
+    return (-1);
+
+def export_mirrortab(context, props):
+    verts = context.active_object.data.vertices
+    bpy.ops.object.mode_set(mode='OBJECT')
+    wm = bpy.context.window_manager
+
+    # create the table without the mirroring
+
+    nvnum = 0
+    for vnum, vrt in enumerate(verts):
+        mirror[vnum] = { 'x': vrt.co[0], 'y': vrt.co[1], 'z': vrt.co[2], 'm': -1 }
+        nvnum += 1
+
+    # now calculate mirror
+    wm.progress_begin(0,10)
+    progress = 1
+
+    still_unmirrored = True
+    unmirrored = 0
+    for eps in [0, 0.0001, 0.0002, 0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05]:
+        if still_unmirrored and eps <= props.eps:
+            wm.progress_update(progress)
+            # print ("epsilon " + str(eps) + ": ")
+
+            unmirrored = 0
+            for i in range (0, nvnum):
+                if mirror[i]["m"] == -1:
+                    mirror[i]["m"] = GetMirrorVNum ( mirror[i]["x"], mirror[i]["y"], mirror[i]["z"], i, eps)
+                    if ( mirror[i]["m"]  == -1):
+                        unmirrored +=1
+            # print (str(unmirrored) + " unmirrored vertices")
+            if unmirrored == 0:
+                still_unmirrored = False
+            progress += 1
+
+    wm.progress_end()
+
+    with open(props.filepath, 'w') as fp:
+        for i in range (0, nvnum):
+            pos = 'l'
+            if mirror[i]["m"] == i:
+                pos = 'm'
+            elif mirror[i]["x"] < 0:
+                pos = 'r'
+            fp.write (str(i) + " " + str(mirror[i]["m"]) + " " + pos + "\n")
+        fp.close()
+
+    if still_unmirrored:
+        ShowMessageBox(str(unmirrored) + " Vertices. Check lines with -1 in file", "Mesh cannot be fully mirrored", 'ERROR')
 
 def export_weights (context, props):
     bpy.ops.object.mode_set(mode='OBJECT')
@@ -402,9 +472,9 @@ class ImportMHW(bpy.types.Operator, ImportHelper):
         return {'FINISHED'}
 
 class MIRRORMESH_assign_mirrortab(bpy.types.Operator, ImportHelper):
-    '''Assign a mirror table to object'''
+    '''Assign a mirror table to a mesh'''
     bl_idname = "mirror.assign_tab"
-    bl_label = 'Assign a Mirror table to a mesh'
+    bl_label = 'Assign a Mirror Table to a Mesh'
     bl_options = {'REGISTER'}
 
     @classmethod
@@ -429,6 +499,24 @@ class MIRRORMESH_assign_mirrortab(bpy.types.Operator, ImportHelper):
     def execute(self, context):
         obj = context.object
         obj['mirrortable'] = self.properties.filepath
+        return {'FINISHED'}
+
+class MIRRORMESH_create_mirrortab(bpy.types.Operator, ExportHelper):
+    '''Create and export a mirror table of a mesh'''
+    bl_idname = "mirror.create_tab"
+    bl_label = 'Create and Export a Mirror Table of a Mesh'
+    bl_options = {'REGISTER'}
+    filename_ext = ".txt"
+
+    eps   = bpy.props.FloatProperty(name="Epsilon", min=0, max=0.05, description="Deviation of the mirrored vertex", default= 0.05)
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH"
+
+    def execute(self, context):
+        export_mirrortab(context, self.properties)
         return {'FINISHED'}
 
 class MIRRORMESH_vgroups_by_table_lr(bpy.types.Operator):
@@ -514,6 +602,9 @@ def import_func(self, context):
 def assign_mirrortab_func(self, context):
     self.layout.operator("mirror.assign_tab", text="Assign Mirror Table")
 
+def create_mirrortab_func(self, context):
+    self.layout.operator("mirror.create_tab", text="Create and Export Mirror Table")
+
 def mirror_select_func(self, context):
     self.layout.operator("mirror.mesh_by_table", text="Mirror Mesh by Table")
 
@@ -527,6 +618,7 @@ def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_file_export.append(export_func)
     bpy.types.INFO_MT_file_import.append(import_func)
+    bpy.types.INFO_MT_file_export.append(create_mirrortab_func)
     bpy.types.VIEW3D_MT_edit_mesh_vertices.append(assign_mirrortab_func)
     bpy.types.VIEW3D_MT_select_edit_mesh.prepend(mirror_select_func)
     bpy.types.VIEW3D_MT_mirror.append(mirror_vgroups_left2right_func)
@@ -536,6 +628,7 @@ def unregister():
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_file_export.remove(export_func)
     bpy.types.INFO_MT_file_import.remove(import_func)
+    bpy.types.INFO_MT_file_export.remove(create_mirrortab_func)
     bpy.types.VIEW3D_MT_edit_mesh_vertices.remove(assign_mirrortab_func)
     bpy.types.VIEW3D_MT_select_edit_mesh.remove(mirror_select_func)
     bpy.types.VIEW3D_MT_mirror.remove(mirror_vgroups_left2right_func)
