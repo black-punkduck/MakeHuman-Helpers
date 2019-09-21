@@ -473,7 +473,6 @@ class MIRRORMESH_mesh_by_table(bpy.types.Operator):
         return obj and obj.type == "MESH" and 'mirrortable' in obj
 
     def execute(self, context):
-        print ("Select the other side")
         obj = context.object
         mirrortab = obj['mirrortable']
         if read_mirror_tab (mirrortab) is False:
@@ -501,18 +500,9 @@ class MIRRORMESH_mesh_by_table(bpy.types.Operator):
                 ShowMessageBox("mirrortable does not fit", "Mirror Table Mismatch", 'ERROR')
                 return {'CANCELLED'}
 
-        # recalculate edges
-        for edge in bm.edges:
-            if edge.verts[0].select and edge.verts[1].select:
-                edge.select = True
+        bm.select_flush(True)
+        bm.select_flush(False)
 
-        # recalculate faces
-        for face in bm.faces:
-            b = True
-            for edges in face.edges:
-                b &= edges.select
-            if b:
-                face.select = b
         bmesh.update_edit_mesh(me, True)
         return {'FINISHED'}
 
