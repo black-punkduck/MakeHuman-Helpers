@@ -44,14 +44,18 @@ mirror selection in edit mode
     select > Mirror Mesh by Table
 
 mirror vertex groups (edit mode .. switches to object mode)
-    mesh > mirror > Mirror Vertex Groups by Table (L>R)   
-    mesh > mirror > Mirror Vertex Groups by Table (R>L)   
+    mesh > mirror > Mirror Vertex Groups by Table (L>R)
+    mesh > mirror > Mirror Vertex Groups by Table (R>L)
+
+mirror shape keys (edit mode .. switches to object mode)
+    mesh > mirror > Mirror Shape Keys by Table (L>R)
+    mesh > mirror > Mirror Shape Keys by Table (R>L)
 """
 
 bl_info = {
     "name": "MakeHuman Weighting",
     "author": "black-punkduck",
-    "version": (2019, 9, 21),
+    "version": (2019, 9, 22),
     "blender": (2, 80, 0),
     "location": "File > Export > MakeHuman Weightfile",
     "description": "Import and Export a MakeHuman weightfile (.mhw), Mirroring using a mirror-table",
@@ -418,6 +422,72 @@ def mirror_vgroups (context, direction):
 
     return {'FINISHED'}
 
+def mirror_shapekeys (context, direction):
+    bpy.ops.object.mode_set(mode='OBJECT')
+    ob = context.active_object
+
+    # load mirrored table
+    #
+    mirrortab = ob['mirrortable']
+    if read_mirror_tab (mirrortab) is False:
+        ShowMessageBox("Cannot load " + mirrortab, "Mirror Table Mismatch", 'ERROR')
+        return {'CANCELLED'}
+
+    # delete all shapekeys of destination side
+    # keep those in an array we want to change
+    #   
+
+    names = []
+
+    for shape in ob.data.shape_keys.key_blocks:
+        (orientation, partner) = evaluate_side(shape.name)
+        if orientation != 'm' and orientation != direction:
+            print ("delete shape key " + shape.name)
+            ob.shape_key_remove(shape)
+        else:
+            # in case of "Basis", skip
+            if shape.name != "Basis":
+                names.append(shape.name)
+            
+
+    # get original object once
+    basis = ob.data.shape_keys.key_blocks["Basis"].data
+
+    # now create mirrored groups and symmetrize mid ones
+    #
+    for name in names:
+        # now check what to do
+        #
+        (orientation, partner) = evaluate_side(name)
+
+        if orientation == 'm':
+            # create internal group symmetry
+            # print ("Symmetrize " + name)
+            source = ob.data.shape_keys.key_blocks[name].data
+            for idx, vert in enumerate (source):
+                if mirror[idx]['s'] == direction:
+                    destvert = mirror[idx]['m']
+                    x = basis[idx].co[0] - vert.co[0]
+                    y = basis[idx].co[1] - vert.co[1]
+                    z = basis[idx].co[2] - vert.co[2]
+                    source[destvert].co = [basis[destvert].co[0] +x , basis[destvert].co[1] - y, basis[destvert].co[2] -z]
+        else:
+            # create symmetric group
+            # print ("Creating Partner of " + name + ": " + partner)
+
+            nshapeKey = ob.shape_key_add(from_mix=False)
+            nshapeKey.name = partner
+            source = ob.data.shape_keys.key_blocks[name].data
+
+            for idx, vert in enumerate (source):
+                destvert = mirror[idx]['m']
+                x = basis[idx].co[0] - vert.co[0]
+                y = basis[idx].co[1] - vert.co[1]
+                z = basis[idx].co[2] - vert.co[2]
+                nshapeKey.data[destvert].co = [basis[destvert].co[0] +x , basis[destvert].co[1] - y, basis[destvert].co[2] -z]
+
+    return {'FINISHED'}
+
 class ExportMHW(bpy.types.Operator, ExportHelper):
     '''Export an MHW File'''
     bl_idname = "export.mhw"
@@ -472,9 +542,9 @@ class ImportMHW(bpy.types.Operator, ImportHelper):
         return {'FINISHED'}
 
 class MIRRORMESH_assign_mirrortab(bpy.types.Operator, ImportHelper):
-    '''Assign a mirror table to object'''
+    '''Assign a mirror table to a mesh'''
     bl_idname = "mirror.assign_tab"
-    bl_label = 'Assign a Mirror table to a mesh'
+    bl_label = 'Assign a Mirror Table to a Mesh'
     bl_options = {'REGISTER'}
 
     @classmethod
@@ -522,7 +592,7 @@ class MIRRORMESH_create_mirrortab(bpy.types.Operator, ExportHelper):
 class MIRRORMESH_vgroups_by_table_lr(bpy.types.Operator):
     '''Mirror Vertex Groups using a table from left to right'''
     bl_idname = "mirror.vgroups_by_table_lr"
-    bl_label = 'Mirror Mesh using a table from left to right'
+    bl_label = 'Mirror Vertex Groups using a table from left to right'
     bl_options = {'REGISTER'}
 
     @classmethod
@@ -547,6 +617,36 @@ class MIRRORMESH_vgroups_by_table_rl(bpy.types.Operator):
 
     def execute(self, context):
         mirror_vgroups(context, "r")
+        return  {'FINISHED'}
+
+class MIRRORMESH_shapekeys_by_table_lr(bpy.types.Operator):
+    '''Mirror Shape Keys using a table from left to right'''
+    bl_idname = "mirror.shapekeys_by_table_lr"
+    bl_label = 'Mirror Shape Keys using a table from left to right'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and obj.data.shape_keys is not None and 'mirrortable' in obj
+
+    def execute(self, context):
+        mirror_shapekeys(context, "l")
+        return  {'FINISHED'}
+
+class MIRRORMESH_shapekeys_by_table_rl(bpy.types.Operator):
+    '''Mirror Shape Keys using a table from right to left'''
+    bl_idname = "mirror.shapekeys_by_table_rl"
+    bl_label = 'Mirror Shape Keys using a table from right to left'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and obj.data.shape_keys is not None and 'mirrortable' in obj
+
+    def execute(self, context):
+        mirror_shapekeys(context, "r")
         return  {'FINISHED'}
 
 class MIRRORMESH_mesh_by_table(bpy.types.Operator):
@@ -615,6 +715,12 @@ def mirror_vgroups_left2right_func(self, context):
 def mirror_vgroups_right2left_func(self, context):
     self.layout.operator("mirror.vgroups_by_table_rl", text="Mirror Vertex Groups by Table (R>L)")
 
+def mirror_shapekeys_left2right_func(self, context):
+    self.layout.operator("mirror.shapekeys_by_table_lr", text="Mirror Shape Keys by Table (L>R)")
+
+def mirror_shapekeys_right2left_func(self, context):
+    self.layout.operator("mirror.shapekeys_by_table_rl", text="Mirror Shape Keys by Table (R>L)")
+
 def register():
     bpy.utils.register_class(ExportMHW)
     bpy.utils.register_class(ImportMHW)
@@ -623,6 +729,8 @@ def register():
     bpy.utils.register_class (MIRRORMESH_create_mirrortab)
     bpy.utils.register_class (MIRRORMESH_vgroups_by_table_rl)
     bpy.utils.register_class (MIRRORMESH_vgroups_by_table_lr)
+    bpy.utils.register_class (MIRRORMESH_shapekeys_by_table_rl)
+    bpy.utils.register_class (MIRRORMESH_shapekeys_by_table_lr)
     bpy.types.TOPBAR_MT_file_export.append(export_func)
     bpy.types.TOPBAR_MT_file_import.append(import_func)
     bpy.types.TOPBAR_MT_file_export.append(create_mirrortab_func)
@@ -630,6 +738,8 @@ def register():
     bpy.types.VIEW3D_MT_select_edit_mesh.prepend(mirror_select_func)
     bpy.types.VIEW3D_MT_mirror.append(mirror_vgroups_left2right_func)
     bpy.types.VIEW3D_MT_mirror.append(mirror_vgroups_right2left_func)
+    bpy.types.VIEW3D_MT_mirror.append(mirror_shapekeys_left2right_func)
+    bpy.types.VIEW3D_MT_mirror.append(mirror_shapekeys_right2left_func)
 
 def unregister():
     bpy.utils.unregister_class(ExportMHW)
@@ -639,6 +749,8 @@ def unregister():
     bpy.utils.unregister_class (MIRRORMESH_create_mirrortab)
     bpy.utils.unregister_class (MIRRORMESH_vgroups_by_table_rl)
     bpy.utils.unregister_class (MIRRORMESH_vgroups_by_table_lr)
+    bpy.utils.unregister_class (MIRRORMESH_shapekeys_by_table_rl)
+    bpy.utils.unregister_class (MIRRORMESH_shapekeys_by_table_lr)
     bpy.types.TOPBAR_MT_file_export.remove(export_func)
     bpy.types.TOPBAR_MT_file_import.remove(import_func)
     bpy.types.TOPBAR_MT_file_export.remove(create_mirrortab_func)
@@ -646,6 +758,8 @@ def unregister():
     bpy.types.VIEW3D_MT_select_edit_mesh.remove(mirror_select_func)
     bpy.types.VIEW3D_MT_mirror.remove(mirror_vgroups_left2right_func)
     bpy.types.VIEW3D_MT_mirror.remove(mirror_vgroups_right2left_func)
+    bpy.types.VIEW3D_MT_mirror.remove(mirror_shapekeys_left2right_func)
+    bpy.types.VIEW3D_MT_mirror.remove(mirror_shapekeys_right2left_func)
 
 
 if __name__ == "__main__":
