@@ -43,6 +43,10 @@ use edit mode
 mirror selection in edit mode
     select > Mirror Mesh by Table
 
+mirror geometry (edit mode .. switches to object mode)
+    mesh > mirror > Mirror Geometry by Table (L>R)
+    mesh > mirror > Mirror Geometry by Table (R>L)
+
 mirror vertex groups (edit mode .. switches to object mode)
     mesh > mirror > Mirror Vertex Groups by Table (L>R)
     mesh > mirror > Mirror Vertex Groups by Table (R>L)
@@ -55,7 +59,7 @@ mirror shape keys (edit mode .. switches to object mode)
 bl_info = {
     "name": "MakeHuman Weighting",
     "author": "black-punkduck",
-    "version": (2019, 9, 22),
+    "version": (2019, 9, 29),
     "blender": (2, 79, 0),
     "location": "File > Export > MakeHuman Weightfile",
     "description": "Import and Export a MakeHuman weightfile (.mhw), Mirroring using a mirror-table",
@@ -488,6 +492,31 @@ def mirror_shapekeys (context, direction):
 
     return {'FINISHED'}
 
+# normal mirroring of the geometry using the table
+#
+def mirror_geometry (context, direction):
+    bpy.ops.object.mode_set(mode='OBJECT')
+    ob = context.active_object
+
+    # load mirrored table
+    #
+    mirrortab = ob['mirrortable']
+    if read_mirror_tab (mirrortab) is False:
+        ShowMessageBox("Cannot load " + mirrortab, "Mirror Table Mismatch", 'ERROR')
+        return {'CANCELLED'}
+
+    for idx, vert in enumerate (ob.data.vertices):
+        if mirror[idx]['s'] == direction:
+            dest = mirror[idx]['m']
+            ob.data.vertices[dest].co[0] = -vert.co[0]
+            ob.data.vertices[dest].co[1] = vert.co[1]
+            ob.data.vertices[dest].co[2] = vert.co[2]
+        elif mirror[idx]['s'] == 'm':
+            vert.co[0] = 0      # push middle to x = 0
+    ob.data.update()
+
+    return {'FINISHED'}
+
 class ExportMHW(bpy.types.Operator, ExportHelper):
     '''Export an MHW File'''
     bl_idname = "export.mhw"
@@ -649,8 +678,40 @@ class MIRRORMESH_shapekeys_by_table_rl(bpy.types.Operator):
         mirror_shapekeys(context, "r")
         return  {'FINISHED'}
 
+class MIRRORMESH_geometry_by_table_lr(bpy.types.Operator):
+    '''Mirror geometry using a table from left to right'''
+    bl_idname = "mirror.geometry_by_table_lr"
+    bl_label = 'Mirror Geometry using a table from left to right'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and 'mirrortable' in obj
+
+    def execute(self, context):
+        mirror_geometry(context, "l")
+        return  {'FINISHED'}
+
+class MIRRORMESH_geometry_by_table_rl(bpy.types.Operator):
+    '''Mirror geometry using a table from right to left'''
+    bl_idname = "mirror.geometry_by_table_rl"
+    bl_label = 'Mirror Geometry using a table from right to left'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and 'mirrortable' in obj
+
+    def execute(self, context):
+        mirror_geometry(context, "r")
+        return  {'FINISHED'}
+
+
+
 class MIRRORMESH_mesh_by_table(bpy.types.Operator):
-    '''Mirror a mesh using a table'''
+    '''Select mirrored vertices using a table'''
     bl_idname = "mirror.mesh_by_table"
     bl_label = 'Mirror Mesh using a table'
     bl_options = {'REGISTER'}
@@ -720,6 +781,12 @@ def mirror_shapekeys_left2right_func(self, context):
 def mirror_shapekeys_right2left_func(self, context):
     self.layout.operator("mirror.shapekeys_by_table_rl", text="Mirror Shape Keys by Table (R>L)")
 
+def mirror_geometry_left2right_func(self, context):
+    self.layout.operator("mirror.geometry_by_table_lr", text="Mirror Geometry by Table (L>R)")
+
+def mirror_geometry_right2left_func(self, context):
+    self.layout.operator("mirror.geometry_by_table_rl", text="Mirror Geometry by Table (R>L)")
+
 
 def register():
     bpy.utils.register_module(__name__)
@@ -728,6 +795,8 @@ def register():
     bpy.types.INFO_MT_file_export.append(create_mirrortab_func)
     bpy.types.VIEW3D_MT_edit_mesh_vertices.append(assign_mirrortab_func)
     bpy.types.VIEW3D_MT_select_edit_mesh.prepend(mirror_select_func)
+    bpy.types.VIEW3D_MT_mirror.append(mirror_geometry_left2right_func)
+    bpy.types.VIEW3D_MT_mirror.append(mirror_geometry_right2left_func)
     bpy.types.VIEW3D_MT_mirror.append(mirror_vgroups_left2right_func)
     bpy.types.VIEW3D_MT_mirror.append(mirror_vgroups_right2left_func)
     bpy.types.VIEW3D_MT_mirror.append(mirror_shapekeys_left2right_func)
@@ -740,6 +809,8 @@ def unregister():
     bpy.types.INFO_MT_file_export.remove(create_mirrortab_func)
     bpy.types.VIEW3D_MT_edit_mesh_vertices.remove(assign_mirrortab_func)
     bpy.types.VIEW3D_MT_select_edit_mesh.remove(mirror_select_func)
+    bpy.types.VIEW3D_MT_mirror.remove(mirror_geometry_left2right_func)
+    bpy.types.VIEW3D_MT_mirror.remove(mirror_geometry_right2left_func)
     bpy.types.VIEW3D_MT_mirror.remove(mirror_vgroups_left2right_func)
     bpy.types.VIEW3D_MT_mirror.remove(mirror_vgroups_right2left_func)
     bpy.types.VIEW3D_MT_mirror.remove(mirror_shapekeys_left2right_func)
