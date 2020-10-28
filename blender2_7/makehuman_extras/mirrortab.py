@@ -131,7 +131,7 @@ class MHE_PT_AssignMirrorTab(bpy.types.Operator, ImportHelper):
 class MHE_PT_CreateMirrorTab(bpy.types.Operator, ExportHelper):
     '''Create and export a mirror table of a mesh'''
     bl_idname = "mhe.create"
-    bl_label = 'Create and Export a Mirror Table of a Mesh'
+    bl_label = 'Create+Export Mirror Table'
     bl_options = {'REGISTER'}
     filename_ext = ".txt"
 

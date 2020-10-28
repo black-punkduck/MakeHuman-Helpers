@@ -53,6 +53,18 @@ class MHE_PT_MakeHumanExtrasPanel(bpy.types.Panel):
             shapek.operator("mhe.mirror_shapekeys_l2r", text="Symmetrize L > R")
             shapek.operator("mhe.mirror_shapekeys_r2l", text="Symmetrize R > L")
 
+            clonew = layout.box()
+            clonew.label(text="Copy", icon="MESH_DATA")
+            clonew.operator("mhe.weights_copy", text="Weights")
+            clonew.operator("mhe.shapekey_copy", text="Shape Keys")
+            clonew.prop(scn,"MHE_clone_from", text="Source")
+            clonew.prop(scn, "MHE_minweight", text="Minimum Weight")
+
+            debug = layout.box()
+            debug.label(text="Debug", icon="MESH_DATA")
+            debug.prop(scn, "MHE_find_vertex", text="Number(s)")
+            debug.operator("mhe.selectbynum", text="Find Vertex Number")
+
 class MHE_WarningBox(bpy.types.Operator):
     bl_idname = "info.warningbox"
     bl_label = ""
