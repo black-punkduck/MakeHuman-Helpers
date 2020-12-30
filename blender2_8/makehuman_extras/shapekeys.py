@@ -69,6 +69,27 @@ def mirror_shapekeys (context, direction):
 
     return {'FINISHED'}
 
+def norm_shapekeys (context):
+    bpy.ops.object.mode_set(mode='OBJECT')
+    ob = context.active_object
+
+    # get original object once
+    basis = ob.data.shape_keys.key_blocks["Basis"].data
+
+    for shape in ob.data.shape_keys.key_blocks:
+        name = shape.name
+        if shape.slider_max > 1 or shape.slider_min < -1:
+            factor = shape.slider_max
+            if -shape.slider_min > shape.slider_max:
+                factor =  -shape.slider_min
+            source = ob.data.shape_keys.key_blocks[name].data
+            for idx, vert in enumerate (source):
+                vert.co = (vert.co - basis[idx].co) * factor + basis[idx].co
+            shape.slider_max /= factor
+            shape.slider_min /= factor
+
+    return {'FINISHED'}
+
 class MHE_MirrorShapeKeysL2R(bpy.types.Operator):
     '''Mirror Shape Keys using a table from left to right'''
     bl_idname = "mhe.mirror_shapekeys_l2r"
@@ -101,5 +122,20 @@ class MHE_MirrorShapeKeysR2L(bpy.types.Operator):
 
     def execute(self, context):
         mirror_shapekeys(context, "r")
+        return  {'FINISHED'}
+
+class MHE_NormShapeKeys(bpy.types.Operator):
+    '''Normalize Shape Keys from -1 to 1 (useful for fbx export) '''
+    bl_idname = "mhe.norm_shapekeys"
+    bl_label = 'Normalize Shape Keys'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and  obj.data.shape_keys is not None 
+
+    def execute(self, context):
+        norm_shapekeys(context)
         return  {'FINISHED'}
 

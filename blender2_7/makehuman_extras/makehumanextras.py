@@ -50,6 +50,7 @@ class MHE_PT_MakeHumanExtrasPanel(bpy.types.Panel):
             shapek.label(text="Shape Keys", icon="SHAPEKEY_DATA")
             shapek.operator("mhe.mirror_shapekeys_l2r", text="Symmetrize L > R")
             shapek.operator("mhe.mirror_shapekeys_r2l", text="Symmetrize R > L")
+            shapek.operator("mhe.norm_shapekeys", text="Normalize to [-1, 1 ]")
 
             clonew = layout.box()
             clonew.label(text="Copy", icon="MESH_DATA")

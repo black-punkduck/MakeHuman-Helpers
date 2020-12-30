@@ -9,7 +9,7 @@
 bl_info = {
     "name": "MakeHuman Extras",
     "author": "black-punkduck",
-    "version": (1,2,0),
+    "version": (1,2,1),
     "blender": (2,79,0),
     "location": "View3D > Properties > MakeHuman Extras",
     "description": "Extra functions to work with MakeHuman Meshes",
@@ -24,7 +24,7 @@ from .makehumanextras import MHE_PT_MakeHumanExtrasPanel, MHE_WarningBox
 from .mirrortab import MHE_PT_AssignMirrorTab, MHE_PT_CreateMirrorTab
 from .meshgeom import MHE_MirrorGeomL2R, MHE_MirrorGeomR2L
 from .vertexgroups import MHE_MirrorVGroupsL2R, MHE_MirrorVGroupsR2L
-from .shapekeys import MHE_MirrorShapeKeysL2R, MHE_MirrorShapeKeysR2L
+from .shapekeys import MHE_MirrorShapeKeysL2R, MHE_MirrorShapeKeysR2L, MHE_NormShapeKeys
 from .selection import MHE_MirrorSelected, MHE_SelectByNumber
 from .copy import MHE_WeightsCopy, MHE_ShapeKeyCopy
 from .mhw import MHE_Export_MHW, MHE_Import_MHW
@@ -40,6 +40,7 @@ MHE_EXTRAS_CLASSES = [
     MHE_MirrorVGroupsR2L,
     MHE_MirrorShapeKeysL2R,         # from shapekeys.py
     MHE_MirrorShapeKeysR2L,
+    MHE_NormShapeKeys,
     MHE_MirrorSelected,             # from selection.py
     MHE_SelectByNumber,
     MHE_WeightsCopy,                # from copy.py
