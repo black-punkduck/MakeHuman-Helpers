@@ -41,7 +41,7 @@ import wprint as wp
 
 configfilename = "data/mh_helper.json"
 
-parser = argparse.ArgumentParser(description='Normalize weights of a weights file so sum up to 1.')
+parser = argparse.ArgumentParser(description='Normalize weights of a weights file so they do sum up to 1.')
 parser.add_argument('-f', default="", metavar='default_weights', help='use different default weight file (default: see configuration)')
 
 parser.add_argument('-s', default=0, metavar='MINWEIGHTNUM', type=int,  help='lowest vertex number to check (default: 0)')
