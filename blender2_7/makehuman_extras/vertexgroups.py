@@ -88,6 +88,46 @@ def mirror_vgroups (context, direction):
 
     return {'FINISHED'}
 
+def cleanup_vgroups (context, minweight):
+
+    bpy.ops.object.mode_set(mode='OBJECT')
+    active = context.active_object
+    vgrp = active.vertex_groups
+    vn = [1]    # our small array ;-)
+    deletegrp = []
+
+    # lets perform a loop on all groups
+    for grp in sorted(vgrp.keys()):
+        gindex = vgrp[grp].index
+        cnt = 0;
+        # now check all vertices of the object
+        for v in active.data.vertices:
+
+            # check all groups of a vertex
+            for g in v.groups:
+
+                # if the index of the group fits to the current group
+                # get the weight of the vertex
+                if g.group == gindex:
+                    weight=vgrp[grp].weight(v.index)
+                    if weight < minweight:
+                        vn[0] = v.index
+                        vgrp[grp].remove(vn)
+                    else:
+                        cnt += 1;
+
+        # if no vertex is left, group can be deleted
+        #
+        if cnt == 0:
+            deletegrp.append(vgrp[grp].name)
+
+
+    for vname in deletegrp:
+        vg = vgrp.get(vname)
+        vgrp.remove(vg)
+
+    return {'FINISHED'}
+
 class MHE_MirrorVGroupsL2R(bpy.types.Operator):
     '''Mirror Vertex Groups using a table from left to right'''
     bl_idname = "mhe.mirror_vgroups_l2r"
@@ -120,3 +160,17 @@ class MHE_MirrorVGroupsR2L(bpy.types.Operator):
         mirror_vgroups(context, "r")
         return  {'FINISHED'}
 
+class MHE_CleanupVGroups(bpy.types.Operator):
+    '''Cleanup Vertex Groups using a minimum value (also deletes empty groups)'''
+    bl_idname = "mhe.cleanup_vgroups"
+    bl_label = 'Cleanup Vertex Groups using a minimum value'
+    bl_options = {'REGISTER'}
+
+    @classmethod
+    def poll(cls, context):
+        obj = context.object
+        return obj and obj.type == "MESH" and obj.vertex_groups is not None
+
+    def execute(self, context):
+        cleanup_vgroups(context, context.scene.MHE_mincleanup)
+        return  {'FINISHED'}

@@ -43,6 +43,8 @@ class MHE_PT_MakeHumanExtrasPanel(bpy.types.Panel):
             weights.label(text="Vertex Groups / Weights", icon="GROUP_VERTEX")
             weights.operator("mhe.mirror_vgroups_l2r", text="Symmetrize L > R")
             weights.operator("mhe.mirror_vgroups_r2l", text="Symmetrize R > L")
+            weights.operator("mhe.cleanup_vgroups", text="Clean up")
+            weights.prop(scn, "MHE_mincleanup", text="Minimum Value")
             weights.operator("mhe.export_mhw", text="Export as MHW")
             weights.operator("mhe.import_mhw", text="Import from MHW")
 

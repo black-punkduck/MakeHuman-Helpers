@@ -9,7 +9,7 @@
 bl_info = {
     "name": "MakeHuman Extras",
     "author": "black-punkduck",
-    "version": (1,2,1),
+    "version": (1,2,2),
     "blender": (2,80,0),
     "location": "View3D > Properties > MakeHuman Extras",
     "description": "Extra functions to work with MakeHuman Meshes",
@@ -23,7 +23,7 @@ from bpy.props import StringProperty, PointerProperty, FloatProperty
 from .makehumanextras import MHE_PT_MakeHumanExtrasPanel, MHE_WarningBox
 from .mirrortab import MHE_PT_AssignMirrorTab, MHE_PT_CreateMirrorTab, MHE_PT_PredefMirrorTab
 from .meshgeom import MHE_MirrorGeomL2R, MHE_MirrorGeomR2L
-from .vertexgroups import MHE_MirrorVGroupsL2R, MHE_MirrorVGroupsR2L
+from .vertexgroups import MHE_MirrorVGroupsL2R, MHE_MirrorVGroupsR2L, MHE_CleanupVGroups
 from .shapekeys import MHE_MirrorShapeKeysL2R, MHE_MirrorShapeKeysR2L, MHE_NormShapeKeys
 from .selection import MHE_MirrorSelected, MHE_SelectByNumber
 from .copy import MHE_WeightsCopy, MHE_ShapeKeyCopy
@@ -39,6 +39,7 @@ MHE_EXTRAS_CLASSES = [
     MHE_MirrorGeomR2L,
     MHE_MirrorVGroupsL2R,           # from vertexgroups.py
     MHE_MirrorVGroupsR2L,
+    MHE_CleanupVGroups,
     MHE_MirrorShapeKeysL2R,         # from shapekeys.py
     MHE_MirrorShapeKeysR2L,
     MHE_NormShapeKeys,
@@ -57,7 +58,7 @@ def extraProperties():
     bpy.types.Scene.MHE_clone_from = PointerProperty(type=bpy.types.Object, description="the object to copy weights from")
     bpy.types.Scene.MHE_minweight = FloatProperty(name="Minimum Weight", description="minimum weight for weight copy", default=0.001, precision=4)
     bpy.types.Scene.MHE_find_vertex = StringProperty(name="Vertex Number", description="enter vertex numbers like this: 21, 30-35, 64, 68-76")
-
+    bpy.types.Scene.MHE_mincleanup = FloatProperty(name="Minimum Value", description="minimum weight for cleanup", default=0.001, precision=4)
 
 def register():
     extraProperties()
