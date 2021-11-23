@@ -58,7 +58,6 @@ def cloneweights (obj_from, obj_to, UV, eps):
         # list of Vectors
         s_ref = create_uv_reference_table(s_mesh)
         t_ref  = create_uv_reference_table(t_mesh)
-
         ctab = create_comparison_tab(s_ref, t_ref)
     else:
         ctab = [i for i in range (len(t_mesh.vertices))]       # creates identity array
@@ -96,16 +95,19 @@ def cloneweights (obj_from, obj_to, UV, eps):
                 if vg[i].weight > eps:
                     vgroup_collect.append((vg[i].group, vg[i].weight))
             data[vi] = vgroup_collect
+        else:
+            data[vi] = None
 
     # write weights
     for v in t_mesh.vertices:
         t_index = ctab[v.index]
         vgroupIndex_weight = data[t_index]
 
-        for i in range(0, len(vgroupIndex_weight)):
-            groupName = vgroups_IndexName[vgroupIndex_weight[i][0]]
-            vg = t_vgrp.get(groupName)
-            vg.add((t_index,), vgroupIndex_weight[i][1], "REPLACE")
+        if vgroupIndex_weight is not None:
+            for i in range(0, len(vgroupIndex_weight)):
+                groupName = vgroups_IndexName[vgroupIndex_weight[i][0]]
+                vg = t_vgrp.get(groupName)
+                vg.add((t_index,), vgroupIndex_weight[i][1], "REPLACE")
 
 def cloneshapekeys (obj_from, obj_to, UV):
     s_mesh = obj_from.data
