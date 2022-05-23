@@ -34,6 +34,7 @@ def mirror_vgroups (context, direction):
     #
     vn = [1]    # our small array ;-)
 
+    unmirrored = 0
     for grp in sorted(vgrp.keys()):
         #
         # read the group in temporary dictionary
@@ -67,14 +68,17 @@ def mirror_vgroups (context, direction):
             # mid line use it once
             #
             for index in temp:
-                if mirror[index]['s'] == direction:
-                    vn[0] = index
-                    ngrp.add(vn, temp[index], 'ADD')
-                    vn[0] = mirror[index]['m']
-                    ngrp.add(vn, temp[index], 'ADD')
-                elif mirror[index]['s'] == 'm':
-                    vn[0] = index
-                    ngrp.add(vn, temp[index], 'ADD')
+                if index in mirror:
+                    if mirror[index]['s'] == direction:
+                        vn[0] = index
+                        ngrp.add(vn, temp[index], 'ADD')
+                        vn[0] = mirror[index]['m']
+                        ngrp.add(vn, temp[index], 'ADD')
+                    elif mirror[index]['s'] == 'm':
+                        vn[0] = index
+                        ngrp.add(vn, temp[index], 'ADD')
+                else:
+                    unmirrored += 1
         else:
             # in case of a left or right group create the identical partner
             # using identical weights
@@ -83,8 +87,14 @@ def mirror_vgroups (context, direction):
             ngrp = vgrp.new(partner)
 
             for index in temp:
-                vn[0] = mirror[index]['m']
-                ngrp.add(vn, temp[index], 'ADD')
+                if index in mirror:
+                    vn[0] = mirror[index]['m']
+                    ngrp.add(vn, temp[index], 'ADD')
+                else:
+                    unmirrored += 1
+
+    if unmirrored > 0:
+        bpy.ops.info.warningbox('INVOKE_DEFAULT', title="Cannot mirror all vertexgroup entries", info= str(unmirrored) + " entries not mirrored.")
 
     return {'FINISHED'}
 

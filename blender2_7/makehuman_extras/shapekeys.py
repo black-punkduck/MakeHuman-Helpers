@@ -36,6 +36,7 @@ def mirror_shapekeys (context, direction):
 
     # now create mirrored groups and symmetrize mid ones
     #
+    unmirrored = 0
     for name in names:
         # now check what to do
         #
@@ -46,12 +47,15 @@ def mirror_shapekeys (context, direction):
             # print ("Symmetrize " + name)
             source = ob.data.shape_keys.key_blocks[name].data
             for idx, vert in enumerate (source):
-                if mirror[idx]['s'] == direction:
-                    destvert = mirror[idx]['m']
-                    x = basis[idx].co[0] - vert.co[0]
-                    y = basis[idx].co[1] - vert.co[1]
-                    z = basis[idx].co[2] - vert.co[2]
-                    source[destvert].co = [basis[destvert].co[0] +x , basis[destvert].co[1] - y, basis[destvert].co[2] -z]
+                if idx in mirror:
+                    if mirror[idx]['s'] == direction:
+                        destvert = mirror[idx]['m']
+                        x = basis[idx].co[0] - vert.co[0]
+                        y = basis[idx].co[1] - vert.co[1]
+                        z = basis[idx].co[2] - vert.co[2]
+                        source[destvert].co = [basis[destvert].co[0] +x , basis[destvert].co[1] - y, basis[destvert].co[2] -z]
+                else:
+                    unmirrored += 1
         else:
             # create symmetric group
             # print ("Creating Partner of " + name + ": " + partner)
@@ -61,12 +65,17 @@ def mirror_shapekeys (context, direction):
             source = ob.data.shape_keys.key_blocks[name].data
 
             for idx, vert in enumerate (source):
-                destvert = mirror[idx]['m']
-                x = basis[idx].co[0] - vert.co[0]
-                y = basis[idx].co[1] - vert.co[1]
-                z = basis[idx].co[2] - vert.co[2]
-                nshapeKey.data[destvert].co = [basis[destvert].co[0] +x , basis[destvert].co[1] - y, basis[destvert].co[2] -z]
+                if idx in mirror:
+                    destvert = mirror[idx]['m']
+                    x = basis[idx].co[0] - vert.co[0]
+                    y = basis[idx].co[1] - vert.co[1]
+                    z = basis[idx].co[2] - vert.co[2]
+                    nshapeKey.data[destvert].co = [basis[destvert].co[0] +x , basis[destvert].co[1] - y, basis[destvert].co[2] -z]
+                else:
+                    unmirrored += 1
 
+    if unmirrored > 0:
+        bpy.ops.info.warningbox('INVOKE_DEFAULT', title="Cannot mirror all vertices", info= str(unmirrored) + " verts not mirrored.")
     return {'FINISHED'}
 
 def norm_shapekeys (context):

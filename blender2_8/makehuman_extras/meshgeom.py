@@ -11,19 +11,27 @@ def mirror_geometry (context, direction):
     #
     mirrortab = ob.mirrortable
     mirror = read_mirror_tab(mirrortab)
+    unmirrored = 0
     if mirror is None:
         bpy.ops.info.warningbox('INVOKE_DEFAULT', title="Cannot load mirror table, Mirror table mismatch", info=mirrortab)
         return {'CANCELLED'}
 
     for idx, vert in enumerate (ob.data.vertices):
-        if mirror[idx]['s'] == direction:
-            dest = mirror[idx]['m']
-            ob.data.vertices[dest].co[0] = -vert.co[0]
-            ob.data.vertices[dest].co[1] = vert.co[1]
-            ob.data.vertices[dest].co[2] = vert.co[2]
-        elif mirror[idx]['s'] == 'm':
-            vert.co[0] = 0      # push middle to x = 0
+        if idx in mirror:
+            if mirror[idx]['s'] == direction:
+                dest = mirror[idx]['m']
+                ob.data.vertices[dest].co[0] = -vert.co[0]
+                ob.data.vertices[dest].co[1] = vert.co[1]
+                ob.data.vertices[dest].co[2] = vert.co[2]
+            elif mirror[idx]['s'] == 'm':
+                vert.co[0] = 0      # push middle to x = 0
+        else:
+            unmirrored += 1
+
     ob.data.update()
+    if unmirrored > 0:
+        bpy.ops.info.warningbox('INVOKE_DEFAULT', title="Cannot mirror all vertices", info= str(unmirrored) + " verts not mirrored.")
+
 
     return {'FINISHED'}
 
