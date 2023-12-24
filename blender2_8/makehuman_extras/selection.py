@@ -41,7 +41,7 @@ class MHE_SelectByNumber(bpy.types.Operator):
         vertices= [e for e in bm.verts]
         for vert in vertices:
             vert.select = marktab[vert.index]
-        bmesh.update_edit_mesh(mesh, True)   
+        bmesh.update_edit_mesh(mesh, destructive=False)
         context.space_data.overlay.show_extra_indices = True
         return {'FINISHED'}
 
@@ -92,6 +92,6 @@ class MHE_MirrorSelected(bpy.types.Operator):
         bm.select_flush(True)
         bm.select_flush(False)
 
-        bmesh.update_edit_mesh(me, True)
+        bmesh.update_edit_mesh(me, destructive=False)
         return {'FINISHED'}
 
